@@ -7,7 +7,7 @@
 
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 640
-#define FRAMERATE 1
+#define FRAMERATE 60
 
 typedef Uint32 pixel_t;
 pixel_t color_off;
@@ -54,7 +54,6 @@ void init(SDL_Window*& window, SDL_Renderer*& renderer, SDL_Texture*& chip8_scre
         error_out();
     }
 
-    // We're only outputting hex here.
     std::cout << std::hex << std::uppercase;
 }
 

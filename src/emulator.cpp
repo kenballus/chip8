@@ -43,7 +43,7 @@ void Chip8::cls() {
 }
 
 void Chip8::ret() {
-    std::cout << "Returning to subroutine called from address 0x" << stack[sp] << std::endl;
+    std::cout << "Returning from subroutine to address 0x" << stack[sp] << std::endl;
     pc = stack[sp--];
 }
 
@@ -60,6 +60,7 @@ void Chip8::call(uint16_t addr) {
 }
 
 void Chip8::seval(uint8_t reg, uint8_t val) {
+    std::cout << "Comparing R" << (unsigned int)reg << " to value " << (unsigned int)val << " resulting in " << (registers[reg] == val ? " and they match; skipping next instruction" : " and they differ; doing nothing") << std::endl;
     if (registers[reg] == val) {
         pc += INSTRUCTION_SIZE;
     }
@@ -72,21 +73,25 @@ void Chip8::sneval(uint8_t reg, uint8_t val) {
 }
 
 void Chip8::sereg(uint8_t reg1, uint8_t reg2) {
+std::cout << "Comparing R" << (unsigned int)reg1 << " to R" << (unsigned int)reg2 << (registers[reg1] == registers[reg2] ? " and they match; skipping next instruction" : " and they differ; doing nothing") << std::endl;
     if (registers[reg1] == registers[reg2]) {
         pc += INSTRUCTION_SIZE;
     }
 }
 
 void Chip8::ldval(uint8_t reg, uint8_t val) {
+    std::cout << "Loading value " << (unsigned int)val << " into R" << (unsigned int)reg << std::endl;
     registers[reg] = val;
 }
 
 void Chip8::addval(uint8_t reg, uint8_t val) {
+    std::cout << "Adding " << (unsigned int)val << " to R" << (unsigned int)reg << ", currently containing " << (unsigned int)registers[reg] << std::endl;
     registers[reg] += val;
 }
 
 void Chip8::ldreg(uint8_t reg1, uint8_t reg2) {
-    registers[reg1] = reg2;
+    std::cout << "Loading value " << (unsigned int)registers[reg2] << " from R" << (unsigned int)reg2 << " into R" << (unsigned int)reg1 << std::endl;
+    registers[reg1] = registers[reg2];
 }
 
 void Chip8::orreg(uint8_t reg1, uint8_t reg2) {
@@ -161,9 +166,14 @@ void Chip8::toggle_pixel(uint8_t reg1, uint8_t reg2) {
 
 void Chip8::drw(uint8_t reg1, uint8_t reg2, uint8_t bytes_in_sprite) {
     for (uint ctr = 0; ctr < bytes_in_sprite; ctr++) {
-        screen[registers[reg1] * CHIP8_SCREEN_WIDTH + registers[reg2] + ctr] ^= memory[i];
-        if (screen[registers[reg1] * CHIP8_SCREEN_WIDTH + registers[reg2] + ctr] == 0 && memory[i] == 1) {
-            registers[0xF] = 1;
+        for (uint bit_ctr = 0; bit_ctr < 8; bit_ctr++) {
+            screen[registers[reg1] * CHIP8_SCREEN_WIDTH + registers[reg2] + ctr * 8 + bit_ctr] ^= (bool)(memory[i + ctr] & 1<<(7 - bit_ctr));
+            if (memory[i + ctr] & 1<<(7 - bit_ctr)) {
+                std::cout << "Toggling pixel at (" << (unsigned int)registers[reg1] + ctr / 8 << ", " << (unsigned int)registers[reg2] + (ctr % 8) * 8 + bit_ctr << ")" << std::endl;
+            }
+            if (screen[registers[reg1] * CHIP8_SCREEN_WIDTH + registers[reg2] + ctr * 8 + bit_ctr] == 0 && memory[i] == 1) {
+                registers[0xF] = 1;
+            }
         }
     }
 }
@@ -253,11 +263,11 @@ void Chip8::update_timers() {
 }
 
 void Chip8::apply_opcode(uint16_t opcode) {
-    std::cout << "Executing opcode: 0x" << opcode << " at address 0x" << pc << std::endl;
+    std::cout << "Executing opcode 0x" << opcode << " at address 0x" << pc << std::endl;
     if (opcode == 0x0000) {
         std::cout << "Quitting." << std::endl;
         dump_state();
-        // dump_mem();
+        dump_mem();
         exit(0);
     }
     else if (opcode == 0x00e0) {
@@ -278,25 +288,103 @@ void Chip8::apply_opcode(uint16_t opcode) {
     else if (0x4000 <= opcode && opcode <= 0x4fff) {
         sneval((opcode & 0x0f00) >> 8, opcode & 0x00ff);
     }
-    else if (0x5000 <= opcode && opcode <= 0x5ff0) {
+    else if (0x5000 <= opcode && opcode <= 0x5fff && (opcode & 0x000f) == 0x0) { // starts with 5 and ends with 0
         sereg((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
     }
     else if (0x6000 <= opcode && opcode <= 0x6fff) {
         ldval((opcode & 0x0f00) >> 8, opcode & 0x00ff);
     }
-    std::cout << std::endl;
+    else if (0x7000 <= opcode && opcode <= 0x7fff) {
+        addval((opcode & 0x0f00) >> 8, opcode & 0x00ff);
+    }
+    else if (0x8000 <= opcode && opcode <= 0x8fff && (opcode & 0x000f) == 0x0) { // starts with 8 and ends with 0
+        ldreg((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0x8000 <= opcode && opcode <= 0x8fff && (opcode & 0x000f) == 0x1) { // starts with 8 and ends with 1
+        orreg((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0x8000 <= opcode && opcode <= 0x8fff && (opcode & 0x000f) == 0x2) { // starts with 8 and ends with 2
+        andreg((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0x8000 <= opcode && opcode <= 0x8fff && (opcode & 0x000f) == 0x3) { // starts with 8 and ends with 3
+        xorreg((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0x8000 <= opcode && opcode <= 0x8fff && (opcode & 0x000f) == 0x4) { // starts with 8 and ends with 4
+        addreg((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0x8000 <= opcode && opcode <= 0x8fff && (opcode & 0x000f) == 0x5) { // starts with 8 and ends with 5
+        subreg((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0x8000 <= opcode && opcode <= 0x8fff && (opcode & 0x000f) == 0x6) { // starts with 8 and ends with 6
+        shr((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0x8000 <= opcode && opcode <= 0x8fff && (opcode & 0x000f) == 0x7) { // starts with 8 and ends with 7
+        subnreg((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0x8000 <= opcode && opcode <= 0x8fff && (opcode & 0x000f) == 0xe) { // starts with 8 and ends with e
+        shl((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0x9000 <= opcode && opcode <= 0x9fff && (opcode & 0x000f) == 0x0) { // starts with 9 and ends with 0
+        snereg((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0xa000 <= opcode && opcode <= 0xafff) {
+        ldi(opcode & 0x0fff);
+    }
+    else if (0xb000 <= opcode && opcode <= 0xbfff) {
+        jmpv0(opcode & 0x0fff);
+    }
+    else if (0xc000 <= opcode && opcode <= 0xcfff) {
+        rnd((opcode & 0x0f00) >> 8, opcode & 0x00ff);
+    }
+    else if (0xd000 <= opcode && opcode <= 0xdfff) {
+        drw((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4, opcode & 0x000f);
+    }
+    else if (0xe000 <= opcode && opcode <= 0xefff && (opcode & 0x00ff) == 0x9e) { // starts with e and ends with 9e
+        skp((opcode & 0x0f00) >> 8);
+    }
+    else if (0xe000 <= opcode && opcode <= 0xefff && (opcode & 0x00ff) == 0xa1) { // starts with e and ends with a1
+        sknp((opcode & 0x0f00) >> 8);
+    }
+    else if (0xf000 <= opcode && (opcode & 0x00ff) == 0x07) { // starts with f and ends with 07
+        lddt((opcode & 0x0f00) >> 8);
+    }
+    else if (0xf000 <= opcode && (opcode & 0x00ff) == 0x0a) { // starts with f and ends with 0a
+        ldk((opcode & 0x0f00) >> 8);
+    }
+    else if (0xf000 <= opcode && (opcode & 0x00ff) == 0x15) { // starts with f and ends with 15
+        ldintodt((opcode & 0x0f00) >> 8);
+    }
+    else if (0xf000 <= opcode && (opcode & 0x00ff) == 0x18) { // starts with f and ends with 18
+        ldintost((opcode & 0x0f00) >> 8);
+    }
+    else if (0xf000 <= opcode && (opcode & 0x00ff) == 0x1e) { // starts with f and ends with 1e
+        addi((opcode & 0x0f00) >> 8);
+    }
+    else if (0xf000 <= opcode && (opcode & 0x00ff) == 0x29) { // starts with f and ends with 29
+        ldf((opcode & 0x0f00) >> 8);
+    }
+    else if (0xf000 <= opcode && (opcode & 0x00ff) == 0x33) { // starts with f and ends with 33
+        ldb((opcode & 0x0f00) >> 8);
+    }
+    else if (0xf000 <= opcode && (opcode & 0x00ff) == 0x55) { // starts with f and ends with 55
+        storange((opcode & 0x0f00) >> 8);
+    }
+    else if (0xf000 <= opcode && (opcode & 0x00ff) == 0x65) { // starts with f and ends with 65
+        ldrange((opcode & 0x0f00) >> 8);
+    }
+    else {
+        std::cout << "Unknown opcode " << opcode << std::endl;
+    }
 }
 
 void Chip8::dump_state() {
     for (int ctr = 0; ctr < 16; ctr++) {
-        std::cout << "R" << ctr << ": " << (unsigned int)registers[ctr] << " ";
+        std::cout << "R" << ctr << ": " << (registers[ctr] < 0xF ? "0" : "") << (unsigned int)registers[ctr] << " ";
+        if (ctr == 7) {
+            std::cout << "\n";
+        }
     }
-    std::cout << "\n";
-    std::cout << "SP: " << (unsigned int)sp << " "
-              << "ST: " << (unsigned int)st << " "
-              << "DT: " << (unsigned int)dt << " "
-              << "I:  " << (unsigned int)i  << " "
-              << "PC: " << (unsigned int)pc << std::endl;
+    std::cout << "\n" << "ST: " << (unsigned int)st << " " << "DT: " << (unsigned int)dt << " " << "I:  " << (unsigned int)i  << " " << "SP: " << (unsigned int)sp << " " << "PC: " << (unsigned int)pc << std::endl;
 }
 
 void Chip8::dump_mem() {
@@ -308,6 +396,7 @@ void Chip8::dump_mem() {
         if (memory[ctr] <= 0xf) {
             std::cout << "0";
         }
+
         std::cout << (int)memory[ctr] << " ";
     }
 }
