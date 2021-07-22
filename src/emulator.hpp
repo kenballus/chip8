@@ -2,11 +2,12 @@
 
 #include <stdint.h>
 
-int const CHIP8_SCREEN_WIDTH = 64;
-int const CHIP8_SCREEN_HEIGHT = 32;
-int const NUM_PX = CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT;
-int const NUM_KEYS = 16;
-int const NUM_REGISTERS = 16;
+#define CHIP8_SCREEN_WIDTH 64
+#define CHIP8_SCREEN_HEIGHT 32
+#define NUM_PX (CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT)
+#define NUM_KEYS 16
+#define NUM_REGISTERS 16
+#define INSTRUCTION_SIZE 2
 
 class Chip8 {
 public:
@@ -16,7 +17,7 @@ public:
     uint8_t st = 0;
 
     uint16_t i = 0; // This is a bad name
-    uint16_t pc = 0x200;
+    uint16_t pc = 0x200 - 2; // pc += 2 before each instruction including the first.
     uint16_t sp = 0;
 
     uint8_t memory[4096] = {0};
@@ -65,8 +66,10 @@ public:
     void ldb(uint8_t reg);
     void storange(uint8_t last_reg);
     void ldrange(uint8_t last_reg);
+    void beep();
 
-    void update();
+    void execute();
+    void update_timers();
     void dump_state();
     void dump_mem();
 };

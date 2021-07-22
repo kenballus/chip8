@@ -5,8 +5,9 @@
 
 #include "emulator.hpp"
 
-int const SCREEN_WIDTH = 1280;
-int const SCREEN_HEIGHT = 640;
+#define SCREEN_WIDTH 1280
+#define SCREEN_HEIGHT 640
+#define FRAMERATE 1
 
 typedef Uint32 pixel_t;
 pixel_t color_off;
@@ -52,6 +53,9 @@ void init(SDL_Window*& window, SDL_Renderer*& renderer, SDL_Texture*& chip8_scre
     if (chip8_screen == NULL) {
         error_out();
     }
+
+    // We're only outputting hex here.
+    std::cout << std::hex << std::uppercase;
 }
 
 void deinit(SDL_Window*& window, SDL_Renderer*& renderer, SDL_Texture*& chip8_screen) {
@@ -148,6 +152,7 @@ int main(int argc, char* argv[]) {
     SDL_Event event;
     Chip8 chip8;
     auto prev_time = std::chrono::high_resolution_clock::now();
+
     update_chip8_screen(chip8, chip8_screen, renderer, window);
     while (!quit) {
         while (SDL_PollEvent(&event)) { // While there are events to process
@@ -158,14 +163,14 @@ int main(int argc, char* argv[]) {
             else if (event.type == SDL_KEYDOWN or event.type == SDL_KEYUP) {
                 handle_keyboard_event(event, chip8);
             }
-
-            auto const curr_time = std::chrono::high_resolution_clock::now();
-            auto time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - prev_time).count();
-            if (time_diff > 1000/60) {
-                chip8.update();
-                update_chip8_screen(chip8, chip8_screen, renderer, window);
-                prev_time = curr_time;
-            }
+        }
+        chip8.execute();
+        auto const curr_time = std::chrono::high_resolution_clock::now();
+        auto time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - prev_time).count();
+        if (time_diff >= 1000 / FRAMERATE) {
+            chip8.update_timers();
+            update_chip8_screen(chip8, chip8_screen, renderer, window);
+            prev_time = curr_time;
         }
     }
 

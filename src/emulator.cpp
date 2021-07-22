@@ -31,48 +31,49 @@ Chip8::Chip8() {
 
     int ctr = 0;
     while (std::cin.peek() != -1) {
-        std::cout << "Copying " << std::cin.peek() << " into rom memory" << std::endl;
         memory[0x200 + ctr] = std::cin.get();
         ctr++;
     }
+    std::cout << "Copied " << std::dec << ctr << std::hex << " bytes into rom memory." << std::endl;
 }
 
 void Chip8::cls() {
-    for (int i = 0; i < NUM_PX; i++) {
-        screen[i] = 0;
-    }
+    std::cout << "Clearing screen." << std::endl;
+    memset(screen, 0, NUM_PX);
 }
 
 void Chip8::ret() {
+    std::cout << "Returning to subroutine called from address 0x" << stack[sp] << std::endl;
     pc = stack[sp--];
 }
 
 void Chip8::jmp(uint16_t addr) {
-    std::cout << "Jumping to " << addr << std::endl;
-    pc = addr;
+    std::cout << "Jumping to 0x" << addr << std::endl;
+    pc = addr - INSTRUCTION_SIZE;
 }
 
 void Chip8::call(uint16_t addr) {
+    std::cout << "Calling subroutine at 0x" << addr << std::endl;
     sp++;
-    stack[sp] = addr;
-    jmp(addr);
+    stack[sp] = pc;
+    pc = addr - INSTRUCTION_SIZE;
 }
 
 void Chip8::seval(uint8_t reg, uint8_t val) {
     if (registers[reg] == val) {
-        pc += 2;
+        pc += INSTRUCTION_SIZE;
     }
 }
 
 void Chip8::sneval(uint8_t reg, uint8_t val) {
     if (registers[reg] != val) {
-        pc += 2;
+        pc += INSTRUCTION_SIZE;
     }
 }
 
 void Chip8::sereg(uint8_t reg1, uint8_t reg2) {
     if (registers[reg1] == registers[reg2]) {
-        pc += 2;
+        pc += INSTRUCTION_SIZE;
     }
 }
 
@@ -138,7 +139,7 @@ void Chip8::shl(uint8_t reg1, uint8_t reg2) {
 
 void Chip8::snereg(uint8_t reg1, uint8_t reg2) {
     if (registers[reg1] != registers[reg2]) {
-        pc += 2;
+        pc += INSTRUCTION_SIZE;
     }
 }
 
@@ -155,7 +156,7 @@ void Chip8::rnd(uint8_t reg, uint16_t mask) {
 }
 
 void Chip8::toggle_pixel(uint8_t reg1, uint8_t reg2) {
-    screen[registers[reg1] * 64 + registers[reg2]] ^= 1; // 64 is size of a row
+    screen[registers[reg1] * CHIP8_SCREEN_WIDTH + registers[reg2]] ^= 1;
 }
 
 void Chip8::drw(uint8_t reg1, uint8_t reg2, uint8_t bytes_in_sprite) {
@@ -169,13 +170,13 @@ void Chip8::drw(uint8_t reg1, uint8_t reg2, uint8_t bytes_in_sprite) {
 
 void Chip8::skp(uint8_t reg) {
     if (keys_pressed[registers[reg]]) {
-        pc += 2;
+        pc += INSTRUCTION_SIZE;
     }
 }
 
 void Chip8::sknp(uint8_t reg) {
     if (!keys_pressed[registers[reg]]) {
-        pc += 2;
+        pc += INSTRUCTION_SIZE;
     }
 }
 
@@ -232,11 +233,16 @@ void Chip8::ldrange(uint8_t last_reg) {
     }
 }
 
-void beep() {
+void Chip8::beep() {
     
 }
 
-void Chip8::update() {
+void Chip8::execute() {
+    pc += INSTRUCTION_SIZE;
+    apply_opcode(memory[pc] << 8 | memory[pc + 1]);
+}
+
+void Chip8::update_timers() {
     if (st > 0) {
         st--;
     }
@@ -244,14 +250,17 @@ void Chip8::update() {
         dt--;
         beep();
     }
-    apply_opcode(memory[pc] << 8 | memory[pc + 1]);
-    dump_state();
-    // dump_mem();
 }
 
 void Chip8::apply_opcode(uint16_t opcode) {
-    std::cout << "Opcode:" << opcode << std::endl;
-    if (opcode == 0x00e0) {
+    std::cout << "Executing opcode: 0x" << opcode << " at address 0x" << pc << std::endl;
+    if (opcode == 0x0000) {
+        std::cout << "Quitting." << std::endl;
+        dump_state();
+        // dump_mem();
+        exit(0);
+    }
+    else if (opcode == 0x00e0) {
         cls();
     }
     else if (opcode == 0x00ee) {
@@ -264,11 +273,18 @@ void Chip8::apply_opcode(uint16_t opcode) {
         call(opcode & 0x0fff);
     }
     else if (0x3000 <= opcode && opcode <= 0x3fff) {
-        seval(opcode & 0x0f00, opcode & 0x00ff);
+        seval((opcode & 0x0f00) >> 8, opcode & 0x00ff);
     }
     else if (0x4000 <= opcode && opcode <= 0x4fff) {
-        sneval(opcode & 0x0f00, opcode & 0x00ff);
+        sneval((opcode & 0x0f00) >> 8, opcode & 0x00ff);
     }
+    else if (0x5000 <= opcode && opcode <= 0x5ff0) {
+        sereg((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+    }
+    else if (0x6000 <= opcode && opcode <= 0x6fff) {
+        ldval((opcode & 0x0f00) >> 8, opcode & 0x00ff);
+    }
+    std::cout << std::endl;
 }
 
 void Chip8::dump_state() {
@@ -285,6 +301,13 @@ void Chip8::dump_state() {
 
 void Chip8::dump_mem() {
     for (int ctr = 0; ctr < 4096; ctr++) {
+        if (ctr % 32 == 0) {
+            std::cout << "\n0x" << ctr << ":\t";
+        }
+
+        if (memory[ctr] <= 0xf) {
+            std::cout << "0";
+        }
         std::cout << (int)memory[ctr] << " ";
     }
 }
