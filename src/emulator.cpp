@@ -38,29 +38,29 @@ Chip8::Chip8() {
 }
 
 void Chip8::cls() {
-    std::cout << "Clearing screen." << std::endl;
+    // std::cout << "Clearing screen." << std::endl;
     memset(screen, 0, NUM_PX);
 }
 
 void Chip8::ret() {
-    std::cout << "Returning from subroutine to address 0x" << stack[sp] << std::endl;
+    // std::cout << "Returning from subroutine to address 0x" << stack[sp] << std::endl;
     pc = stack[sp--];
 }
 
 void Chip8::jmp(uint16_t addr) {
-    std::cout << "Jumping to 0x" << addr << std::endl;
+    // std::cout << "Jumping to 0x" << addr << std::endl;
     pc = addr - INSTRUCTION_SIZE;
 }
 
 void Chip8::call(uint16_t addr) {
-    std::cout << "Calling subroutine at 0x" << addr << std::endl;
+    // std::cout << "Calling subroutine at 0x" << addr << std::endl;
     sp++;
     stack[sp] = pc;
     pc = addr - INSTRUCTION_SIZE;
 }
 
 void Chip8::seval(uint8_t reg, uint8_t val) {
-    std::cout << "Comparing R" << (unsigned int)reg << " to value " << (unsigned int)val << " resulting in " << (registers[reg] == val ? " and they match; skipping next instruction" : " and they differ; doing nothing") << std::endl;
+    // std::cout << "Comparing R" << (unsigned int)reg << " to value " << (unsigned int)val << " and they " << (registers[reg] == val ? " match; skipping next instruction" : " differ; doing nothing") << std::endl;
     if (registers[reg] == val) {
         pc += INSTRUCTION_SIZE;
     }
@@ -73,24 +73,24 @@ void Chip8::sneval(uint8_t reg, uint8_t val) {
 }
 
 void Chip8::sereg(uint8_t reg1, uint8_t reg2) {
-std::cout << "Comparing R" << (unsigned int)reg1 << " to R" << (unsigned int)reg2 << (registers[reg1] == registers[reg2] ? " and they match; skipping next instruction" : " and they differ; doing nothing") << std::endl;
+// std::cout << "Comparing R" << (unsigned int)reg1 << " to R" << (unsigned int)reg2 << " and they " << (registers[reg1] == registers[reg2] ? " match; skipping next instruction" : " differ; doing nothing") << std::endl;
     if (registers[reg1] == registers[reg2]) {
         pc += INSTRUCTION_SIZE;
     }
 }
 
 void Chip8::ldval(uint8_t reg, uint8_t val) {
-    std::cout << "Loading value " << (unsigned int)val << " into R" << (unsigned int)reg << std::endl;
+    // std::cout << "Loading value " << (unsigned int)val << " into R" << (unsigned int)reg << std::endl;
     registers[reg] = val;
 }
 
 void Chip8::addval(uint8_t reg, uint8_t val) {
-    std::cout << "Adding " << (unsigned int)val << " to R" << (unsigned int)reg << ", currently containing " << (unsigned int)registers[reg] << std::endl;
+    // std::cout << "Adding " << (unsigned int)val << " to R" << (unsigned int)reg << ", currently containing " << (unsigned int)registers[reg] << std::endl;
     registers[reg] += val;
 }
 
 void Chip8::ldreg(uint8_t reg1, uint8_t reg2) {
-    std::cout << "Loading value " << (unsigned int)registers[reg2] << " from R" << (unsigned int)reg2 << " into R" << (unsigned int)reg1 << std::endl;
+    // std::cout << "Loading value " << (unsigned int)registers[reg2] << " from R" << (unsigned int)reg2 << " into R" << (unsigned int)reg1 << std::endl;
     registers[reg1] = registers[reg2];
 }
 
@@ -160,20 +160,24 @@ void Chip8::rnd(uint8_t reg, uint16_t mask) {
     registers[reg] = (rand() % 255) & mask;
 }
 
-void Chip8::toggle_pixel(uint8_t reg1, uint8_t reg2) {
-    screen[registers[reg1] * CHIP8_SCREEN_WIDTH + registers[reg2]] ^= 1;
+void Chip8::toggle_pixel(uint8_t row, uint8_t col) {
+    screen[(row % CHIP8_SCREEN_HEIGHT) * CHIP8_SCREEN_WIDTH + col % CHIP8_SCREEN_WIDTH] ^= 1;
+}
+
+bool Chip8::get_pixel(uint8_t row, uint8_t col) {
+    return screen[(row % CHIP8_SCREEN_HEIGHT) * CHIP8_SCREEN_WIDTH + col % CHIP8_SCREEN_WIDTH];
 }
 
 void Chip8::drw(uint8_t reg1, uint8_t reg2, uint8_t bytes_in_sprite) {
-    for (uint ctr = 0; ctr < bytes_in_sprite; ctr++) {
-        for (uint bit_ctr = 0; bit_ctr < 8; bit_ctr++) {
-            screen[registers[reg1] * CHIP8_SCREEN_WIDTH + registers[reg2] + ctr * 8 + bit_ctr] ^= (bool)(memory[i + ctr] & 1<<(7 - bit_ctr));
-            if (memory[i + ctr] & 1<<(7 - bit_ctr)) {
-                std::cout << "Toggling pixel at (" << (unsigned int)registers[reg1] + ctr / 8 << ", " << (unsigned int)registers[reg2] + (ctr % 8) * 8 + bit_ctr << ")" << std::endl;
+    for (int byte_ctr = 0; byte_ctr < bytes_in_sprite; byte_ctr++) {
+        for (int bit_ctr = 7; bit_ctr >= 0; bit_ctr--) {
+            if (memory[i + byte_ctr] & 1<<bit_ctr) {
+                toggle_pixel(registers[reg2] + byte_ctr, registers[reg1] + 7 - bit_ctr);
+                if (not get_pixel(registers[reg2] + byte_ctr, registers[reg1] + 7 - bit_ctr)) {
+                    registers[0xF] = 1;
+                }
             }
-            if (screen[registers[reg1] * CHIP8_SCREEN_WIDTH + registers[reg2] + ctr * 8 + bit_ctr] == 0 && memory[i] == 1) {
-                registers[0xF] = 1;
-            }
+            
         }
     }
 }
@@ -222,13 +226,9 @@ void Chip8::ldf(uint8_t reg) {
 }
 
 void Chip8::ldb(uint8_t reg) {
-    auto hundreds = registers[reg] / 100;
-    auto tens = (registers[reg] - 100 * hundreds) / 10;
-    auto ones = registers[reg] - 100 * hundreds - 10 * tens;
-
-    memory[i] = hundreds;
-    memory[i + 1] = tens;
-    memory[i + 2] = ones;
+    memory[i] = registers[reg] / 100; // hundreds
+    memory[i + 1] = (registers[reg] % 100) / 10; // tens
+    memory[i + 2] = registers[reg] % 10; // ones
 }
 
 void Chip8::storange(uint8_t last_reg) {
@@ -262,13 +262,17 @@ void Chip8::update_timers() {
     }
 }
 
+void Chip8::crash() {
+    std::cout << "Quitting." << std::endl;
+    dump_state();
+    // dump_mem();
+    exit(0);
+}
+
 void Chip8::apply_opcode(uint16_t opcode) {
-    std::cout << "Executing opcode 0x" << opcode << " at address 0x" << pc << std::endl;
+    // std::cout << "Executing opcode 0x" << opcode << " at address 0x" << pc << std::endl;
     if (opcode == 0x0000) {
-        std::cout << "Quitting." << std::endl;
-        dump_state();
-        dump_mem();
-        exit(0);
+        crash();
     }
     else if (opcode == 0x00e0) {
         cls();

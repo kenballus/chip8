@@ -19,8 +19,10 @@ $(BINARY_NAME): $(OBJ) $(MAIN)
 
 # Compile all the object files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(SRC_DIR)/%.hpp
+	mkdir -p $(OBJ_DIR)
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
 	rm -f $(OBJ_DIR)/*.o $(BINARY_NAME)
+	rmdir --ignore-fail-on-non-empty $(OBJ_DIR)

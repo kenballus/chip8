@@ -172,7 +172,7 @@ int main(int argc, char* argv[]) {
             prev_time = curr_time;
         }
     }
-
+    chip8.crash();
     deinit(window, renderer, chip8_screen);
     return 0;
 }

@@ -2,3 +2,4 @@ chip8
 obj/*
 .gdb_history
 a.out
+others_roms

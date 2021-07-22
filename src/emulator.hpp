@@ -6,7 +6,7 @@
 #define CHIP8_SCREEN_HEIGHT 32
 #define NUM_PX (CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT)
 #define NUM_KEYS 16
-#define NUM_REGISTERS 16
+#define NUM_REGISTERS 0xF
 #define INSTRUCTION_SIZE 2
 
 class Chip8 {
@@ -27,9 +27,10 @@ public:
     bool keys_pressed[NUM_KEYS] = {0};
     bool waiting_for_key = false;
 
-    void toggle_pixel(uint8_t reg1, uint8_t reg2);
+    void toggle_pixel(uint8_t row, uint8_t col);
+    bool get_pixel(uint8_t row, uint8_t col);
     void apply_opcode(uint16_t opcode);
-
+    void crash();
 public:
     Chip8();
     void cls();
