@@ -8,6 +8,8 @@
 #define NUM_KEYS 16
 #define NUM_REGISTERS 0xF
 #define INSTRUCTION_SIZE 2
+#define FONT_ADDRESS 0x50
+#define ROM_ADDRESS 0x200
 
 class Chip8 {
 public:

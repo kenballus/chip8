@@ -27,11 +27,12 @@ Chip8::Chip8() {
         0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
         0xF0, 0x80, 0xF0, 0x80, 0x80, // F
     };
-    std::memcpy(memory, font, 5 * 15);
+    std::cout << sizeof(font) << std::endl;
+    std::memcpy(memory + FONT_ADDRESS, font, sizeof(font));
 
     int ctr = 0;
     while (std::cin.peek() != -1) {
-        memory[0x200 + ctr] = std::cin.get();
+        memory[ROM_ADDRESS + ctr] = std::cin.get();
         ctr++;
     }
     std::cout << "Copied " << std::dec << ctr << std::hex << " bytes into rom memory." << std::endl;
@@ -109,36 +110,31 @@ void Chip8::xorreg(uint8_t reg1, uint8_t reg2) {
 void Chip8::addreg(uint8_t reg1, uint8_t reg2) {
     uint8_t prev = std::min(registers[reg1], registers[reg2]);
     registers[reg1] += registers[reg2];
-    if (prev > registers[reg1]) {
-        registers[0xF] = 1;
-    }
+    registers[0xF] = prev > registers[reg1];
 }
 
 void Chip8::subreg(uint8_t reg1, uint8_t reg2) {
     if (registers[reg1] < registers[reg2]) {
         registers[0xF] = 1;
     }
+    else {
+        registers[0xF] = 0;
+    }
     registers[reg1] -= registers[reg2];
 }
 
-void Chip8::shr(uint8_t reg1, uint8_t reg2) {
-    if ((registers[reg1] & 1) != 0) {
-        registers[0xF] = 1;
-    }
+void Chip8::shr(uint8_t reg1, uint8_t _) {
+    registers[0xF] = registers[reg1] & 1;
     registers[reg1] >>= 1;
 }
 
 void Chip8::subnreg(uint8_t reg1, uint8_t reg2) {
-    if (registers[reg1] > registers[reg2]) {
-        registers[0xF] = 1;
-    }
+    registers[0xF] = registers[reg1] > registers[reg2];
     registers[reg1] = registers[reg2] - registers[reg1];
 }
 
-void Chip8::shl(uint8_t reg1, uint8_t reg2) {
-    if ((registers[reg1] & 1<<7) != 0) {
-        registers[0xF] = 1;
-    }
+void Chip8::shl(uint8_t reg1, uint8_t _) {
+    registers[0xF] = (registers[reg1]<<7)>>7 & 1;
     registers[reg1] <<= 1;
 }
 
@@ -199,11 +195,9 @@ void Chip8::lddt(uint8_t reg) {
 }
 
 void Chip8::ldk(uint8_t reg) {
-    waiting_for_key = true;
-    for (int i = 0; i < NUM_KEYS; i++) {
-        if (keys_pressed[i]) {
-            waiting_for_key = false;
-            registers[reg] = i;
+    for (int ctr = 0; true; ctr++) {
+        if (keys_pressed[ctr % NUM_KEYS]) {
+            registers[reg] = ctr % NUM_KEYS;
             return;
         }
     }
@@ -218,7 +212,7 @@ void Chip8::ldintost(uint8_t reg) {
 }
 
 void Chip8::addi(uint8_t reg) {
-    i += reg;
+    i += registers[reg];
 }
 
 void Chip8::ldf(uint8_t reg) {
@@ -238,26 +232,34 @@ void Chip8::storange(uint8_t last_reg) {
 }
 
 void Chip8::ldrange(uint8_t last_reg) {
-    for (int j = 0; j < NUM_REGISTERS; j++) {
+    for (int j = 0; j < last_reg; j++) {
         registers[j] = memory[i + j];
     }
 }
 
 void Chip8::beep() {
-    
+    std::cout << "beep." << std::endl;
 }
 
 void Chip8::execute() {
     pc += INSTRUCTION_SIZE;
     apply_opcode(memory[pc] << 8 | memory[pc + 1]);
+    dump_state();
 }
 
 void Chip8::update_timers() {
-    if (st > 0) {
-        st--;
+    auto old_dt = dt;
+    dt--;
+    if (dt > old_dt) {
+        dt = old_dt;
     }
-    if (dt > 0) {
-        dt--;
+
+    auto old_st = st;
+    st--;
+    if (st > old_st) {
+        st = old_st;
+    }
+    else {
         beep();
     }
 }
@@ -270,7 +272,7 @@ void Chip8::crash() {
 }
 
 void Chip8::apply_opcode(uint16_t opcode) {
-    // std::cout << "Executing opcode 0x" << opcode << " at address 0x" << pc << std::endl;
+    std::cout << "Executing opcode 0x" << opcode << " at address 0x" << pc << std::endl;
     if (opcode == 0x0000) {
         crash();
     }
@@ -383,12 +385,16 @@ void Chip8::apply_opcode(uint16_t opcode) {
 
 void Chip8::dump_state() {
     for (int ctr = 0; ctr < 16; ctr++) {
-        std::cout << "R" << ctr << ": " << (registers[ctr] < 0xF ? "0" : "") << (unsigned int)registers[ctr] << " ";
+        std::cout << "R" << ctr << ": " << (registers[ctr] <= 0xF ? "0" : "") << (unsigned int)registers[ctr] << " ";
         if (ctr == 7) {
             std::cout << "\n";
         }
     }
-    std::cout << "\n" << "ST: " << (unsigned int)st << " " << "DT: " << (unsigned int)dt << " " << "I:  " << (unsigned int)i  << " " << "SP: " << (unsigned int)sp << " " << "PC: " << (unsigned int)pc << std::endl;
+    std::cout << "\n" << "ST: " << (unsigned int)st << " " <<
+                         "DT: " << (unsigned int)dt << " " <<
+                         "I:  " << (unsigned int)i  << " " <<
+                         "SP: " << (unsigned int)sp << " " <<
+                         "PC: " << (unsigned int)pc << std::endl;
 }
 
 void Chip8::dump_mem() {

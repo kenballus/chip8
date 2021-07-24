@@ -7,7 +7,8 @@
 
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 640
-#define FRAMERATE 60
+#define FRAMERATE 1 // in fps
+#define CLK_SPEED 1000 // in hz
 
 typedef Uint32 pixel_t;
 pixel_t color_off;
@@ -42,7 +43,7 @@ void init(SDL_Window*& window, SDL_Renderer*& renderer, SDL_Texture*& chip8_scre
         error_out();
     }
 
-    if (format->BitsPerPixel / 8 != sizeof(pixel_t)) {
+    if (format->BitsPerPixel != sizeof(pixel_t) * 8) {
         error_out("Wrong bpp!");
     }
     color_off = SDL_MapRGB(format, 0, 0, 0);
@@ -163,9 +164,11 @@ int main(int argc, char* argv[]) {
                 handle_keyboard_event(event, chip8);
             }
         }
-        chip8.execute();
         auto const curr_time = std::chrono::high_resolution_clock::now();
         auto time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - prev_time).count();
+        if (time_diff >= 1000 / CLK_SPEED) {
+            chip8.execute();
+        }
         if (time_diff >= 1000 / FRAMERATE) {
             chip8.update_timers();
             update_chip8_screen(chip8, chip8_screen, renderer, window);
