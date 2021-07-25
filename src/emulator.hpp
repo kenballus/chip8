@@ -28,6 +28,7 @@ public:
     bool screen[NUM_PX] = {0};
     bool keys_pressed[NUM_KEYS] = {0};
     bool waiting_for_key = false;
+    uint8_t key_register = 0;
 
     void toggle_pixel(uint8_t row, uint8_t col);
     bool get_pixel(uint8_t row, uint8_t col);

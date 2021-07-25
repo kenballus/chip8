@@ -195,9 +195,11 @@ void Chip8::lddt(uint8_t reg) {
 }
 
 void Chip8::ldk(uint8_t reg) {
-    for (int ctr = 0; true; ctr++) {
+    waiting_for_key = true;
+    for (int ctr = 0; ctr < NUM_KEYS; ctr++) {
         if (keys_pressed[ctr % NUM_KEYS]) {
             registers[reg] = ctr % NUM_KEYS;
+            waiting_for_key = false;
             return;
         }
     }
@@ -226,40 +228,38 @@ void Chip8::ldb(uint8_t reg) {
 }
 
 void Chip8::storange(uint8_t last_reg) {
-    for (int j = 0; j < NUM_REGISTERS; j++) {
+    for (int j = 0; j <= last_reg; j++) {
         memory[i + j] = registers[j];
     }
 }
 
 void Chip8::ldrange(uint8_t last_reg) {
-    for (int j = 0; j < last_reg; j++) {
+    for (int j = 0; j <= last_reg; j++) {
         registers[j] = memory[i + j];
     }
 }
 
 void Chip8::beep() {
-    std::cout << "beep." << std::endl;
+    std::cout << "beep.\a" << std::endl;
 }
 
 void Chip8::execute() {
+    if (waiting_for_key) {
+        ldk(key_register);
+        return;
+    }
     pc += INSTRUCTION_SIZE;
     apply_opcode(memory[pc] << 8 | memory[pc + 1]);
     dump_state();
 }
 
 void Chip8::update_timers() {
-    auto old_dt = dt;
-    dt--;
-    if (dt > old_dt) {
-        dt = old_dt;
+    if (dt != 0) {
+        dt--;
     }
 
-    auto old_st = st;
-    st--;
-    if (st > old_st) {
-        st = old_st;
-    }
-    else {
+    if (st != 0) {
+        st--;
         beep();
     }
 }
@@ -403,10 +403,6 @@ void Chip8::dump_mem() {
             std::cout << "\n0x" << ctr << ":\t";
         }
 
-        if (memory[ctr] <= 0xf) {
-            std::cout << "0";
-        }
-
-        std::cout << (int)memory[ctr] << " ";
+        std::cout << (memory[ctr] <= 0xf ? "0" : "") << (int)memory[ctr] << " ";
     }
 }

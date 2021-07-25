@@ -7,8 +7,8 @@
 
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 640
-#define FRAMERATE 1 // in fps
-#define CLK_SPEED 1000 // in hz
+#define FRAMERATE 60 // in fps
+#define CLK_SPEED 300 // in hz
 
 typedef Uint32 pixel_t;
 pixel_t color_off;
@@ -138,6 +138,8 @@ void handle_keyboard_event(SDL_Event const& event, Chip8& chip8) {
     case SDLK_v:
         chip8.keys_pressed[15] = val;
         break;
+    default:
+        std::cout << "Unknown key pressed." << std::endl;
     }
 }
 
@@ -152,6 +154,7 @@ int main(int argc, char* argv[]) {
     SDL_Event event;
     Chip8 chip8;
     auto prev_time = std::chrono::high_resolution_clock::now();
+    auto prev_clock_time = prev_time;
 
     update_chip8_screen(chip8, chip8_screen, renderer, window);
     while (!quit) {
@@ -165,10 +168,13 @@ int main(int argc, char* argv[]) {
             }
         }
         auto const curr_time = std::chrono::high_resolution_clock::now();
-        auto time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - prev_time).count();
-        if (time_diff >= 1000 / CLK_SPEED) {
+        auto const clock_diff = std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - prev_clock_time).count();
+        if (clock_diff >= 1000 / CLK_SPEED) {
             chip8.execute();
+            prev_clock_time = curr_time;
         }
+
+        auto time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - prev_time).count();
         if (time_diff >= 1000 / FRAMERATE) {
             chip8.update_timers();
             update_chip8_screen(chip8, chip8_screen, renderer, window);
